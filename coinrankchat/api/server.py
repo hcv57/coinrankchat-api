@@ -3,12 +3,8 @@ import json
 
 from . import db
 
-class Home():
 
-    def on_get(self, _req, resp):
-        resp.body = "API Home"
-
-class Channels():
+class Groups():
 
     def on_get(self, _req, resp):
         doc = db.load_all_channels()
@@ -16,5 +12,4 @@ class Channels():
 
 
 api = app = falcon.API()
-api.add_route('/', Home())
-api.add_route('/channels', Channels())
+api.add_route('/api/groups', Groups())
