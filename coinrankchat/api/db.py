@@ -1,7 +1,7 @@
 import time
 from elasticsearch_dsl import connections, DocType, Text, Integer, Date, datetime, Keyword
 
-from coinrankchat.shared import config
+from . import config
 
 _connection = connections.create_connection(hosts=[config.ELASTIC_HOST], timeout=10, max_retries=20)
 

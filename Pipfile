@@ -12,11 +12,9 @@ python_version = "3.6"
 
 [packages]
 
-telethon = "==0.17.2.1"
 falcon = "*"
-gunicorn = "*"
 elasticsearch-dsl = "*"
-"boto3" = "*"
+"e1839a8" = {path = ".", editable = true}
 
 
 [dev-packages]

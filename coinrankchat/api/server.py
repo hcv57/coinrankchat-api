@@ -1,7 +1,7 @@
 import falcon
 import json
 
-import coinrankchat.shared.db as db
+from . import db
 
 class Home():
 
@@ -15,6 +15,6 @@ class Channels():
         resp.body = json.dumps(doc, ensure_ascii=False, indent=" ")
 
 
-api = application = falcon.API()
+api = app = falcon.API()
 api.add_route('/', Home())
 api.add_route('/channels', Channels())
