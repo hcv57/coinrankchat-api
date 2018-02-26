@@ -11,7 +11,7 @@ while not _connection.ping():
 class ChatUpdate(DocType):
     channel_id = Keyword()
     title = Text()
-    about = Text
+    about = Text()
     username = Keyword()
     participants_count = Integer()
     created_at = Date()
@@ -32,6 +32,7 @@ def load_all_channels():
     return [
         dict(
             [
+                ("_id", b.group_docs.hits.hits[0]['_id']),
                 ("rank", i+1),
                 ("channel_id", b.key),
                 ("title",  b.group_docs.hits.hits[0]['_source'].get('title')),
@@ -43,6 +44,9 @@ def load_all_channels():
         )
         for (i, b) in enumerate(buckets) if b.group_docs.hits.hits[0]['_source'].get('username')
     ]
+
+def load_channel(_id):
+    return ChatUpdate.get(_id).to_dict()
 
 _setup_database()
 
