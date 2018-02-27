@@ -12,6 +12,7 @@ class ChatUpdate(DocType):
     channel_id = Keyword()
     title = Text()
     about = Text()
+    pinnedMessage = Text()
     username = Keyword()
     participants_count = Integer()
     created_at = Date()
@@ -36,13 +37,11 @@ def load_all_channels():
                 ("rank", i+1),
                 ("channel_id", b.key),
                 ("title",  b.group_docs.hits.hits[0]['_source'].get('title')),
-                ("about",  b.group_docs.hits.hits[0]['_source'].get('about')),
-                ("username",  b.group_docs.hits.hits[0]['_source'].get('username')),
                 ("participants_count", b.group_docs.hits.hits[0]['_source'].get('participants_count')),
                 *[(r.key, r.doc_count) for r in b.range.buckets]
             ]
         )
-        for (i, b) in enumerate(buckets) if b.group_docs.hits.hits[0]['_source'].get('username')
+        for (i, b) in enumerate(filter(lambda b_: b_.group_docs.hits.hits[0]['_source'].get('username'), buckets))
     ]
 
 def load_channel(_id):
