@@ -1,5 +1,6 @@
 import time
-from elasticsearch_dsl import connections, DocType, Text, Integer, Date, datetime, Keyword
+from functools import reduce
+from elasticsearch_dsl import connections, DocType, Text, Integer, Date, datetime, Keyword, Float
 
 from . import config
 
@@ -13,6 +14,8 @@ class ChatUpdate(DocType):
     title = Text()
     about = Text()
     pinnedMessage = Text()
+    sentimentPolarity = Float()
+    sentimentSubjectivity = Float()
     username = Keyword()
     participants_count = Integer()
     created_at = Date()
@@ -29,19 +32,20 @@ def _setup_database():
 
 def load_all_channels():
     response = ChatUpdate.search().from_dict(SEARCH_QUERY).execute()
-    buckets = response.aggregations.group.buckets
     return [
         dict(
             [
-                ("_id", b.group_docs.hits.hits[0]['_id']),
-                ("rank", i+1),
+                ("_id", b.latestDocs.hits.hits[0]['_id']),
                 ("channel_id", b.key),
-                ("title",  b.group_docs.hits.hits[0]['_source'].get('title')),
-                ("participants_count", b.group_docs.hits.hits[0]['_source'].get('participants_count')),
-                *[(r.key, r.doc_count) for r in b.range.buckets]
+                ("title",  b.latestDocs.hits.hits[0]['_source'].get('title')),
+                *[(r.key, dict(
+                    num_messages=r.doc_count,
+                    max_participants=int(r.max_participants.value or 0),
+                    sentiment_average=r.sentiment_average.value
+                )) for r in b.byDateRange.buckets]
             ]
         )
-        for (i, b) in enumerate(filter(lambda b_: b_.group_docs.hits.hits[0]['_source'].get('username'), buckets))
+        for b in response.aggregations.byChannel.buckets
     ]
 
 def load_channel(_id):
@@ -49,55 +53,65 @@ def load_channel(_id):
 
 _setup_database()
 
-SEARCH_QUERY = {"query": {
+SEARCH_QUERY = {
+  "query": {
   "constant_score": {
     "filter": {
       "range": {
         "created_at": {
-          "gte": "now-2d"
+          "gte": "now-3d"
         }
       }
     }
   }
-},"size": 0,
+},
+  "size": 0,
   "aggs": {
-  "group": {
-    "terms": {
-      "field": "channel_id",
-      "size": 1000
-    },
-    "aggs": {
-      "group_docs": {
-        "top_hits": {
-          "size": 1,
-          "sort": [{"created_at": {"order": "desc"}}]
+    "byChannel": {
+      "terms": {
+        "field": "channel_id",
+        "size": 9999
+      }
+      , "aggs": {
+        "latestDocs": {
+          "top_hits": {
+            "size": 1,
+            "sort": [{"created_at": {"order": "desc"}}]
+          }
+        },
+        "byDateRange": {
+          "date_range": {
+            "field": "created_at",
+            "ranges": [
+              {
+                "from": "now-1d",
+                "key": "today"
+              },
+              {
+                "from": "now-2d",
+                "to": "now-1d",
+                "key": "yesterday"
+              },
+              {
+                "to": "now-2d",
+                "key": "before_yesterday"
+              }
+            ]
+          }, "aggs": {
+            "max_participants": {
+              "max": {
+                "field": "participants_count"
+              }
+            },
+            "sentiment_average":{
+              "avg": {
+                "field": "sentimentPolarity"
+              }
+            }
+          }
         }
-      },
-      "range":{
-        "date_range": {
-          "field": "created_at",
-          "ranges": [
-              {
-                  "key": "messages_1h",
-                  "from": "now-1h"
-              },
-              {
-                  "key": "messages_prev_1h",
-                  "from": "now-2h",
-                  "to": "now-1h"
-              },
-              {
-                  "key": "messages_24h",
-                  "from": "now-1d"
-              },
-              {
-                  "key": "messages_prev_24h",
-                  "from": "now-2d",
-                  "to": "now-1d"
-              },
-          ]
-        }
+      }
       }
     }
   }
-}}
+
