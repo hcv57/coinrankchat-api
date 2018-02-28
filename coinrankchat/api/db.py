@@ -11,6 +11,7 @@ while not _connection.ping():
 
 class ChatUpdate(DocType):
     channel_id = Keyword()
+    from_id = Keyword()
     title = Text()
     about = Text()
     pinnedMessage = Text()
@@ -38,9 +39,11 @@ def load_all_channels():
                 ("_id", b.latestDocs.hits.hits[0]['_id']),
                 ("channel_id", b.key),
                 ("title",  b.latestDocs.hits.hits[0]['_source'].get('title')),
+                ("global_sentiment_average", response.aggregations.global_sentiment_average.value),
                 *[(r.key, dict(
                     num_messages=r.doc_count,
                     max_participants=int(r.max_participants.value or 0),
+                    distinct_participants=r.distinct_participants.value,
                     sentiment_average=r.sentiment_average.value
                 )) for r in b.byDateRange.buckets]
             ]
@@ -67,6 +70,11 @@ SEARCH_QUERY = {
 },
   "size": 0,
   "aggs": {
+    "global_sentiment_average":{
+      "avg": {
+        "field": "sentimentPolarity"
+      }
+    },
     "byChannel": {
       "terms": {
         "field": "channel_id",
@@ -101,6 +109,11 @@ SEARCH_QUERY = {
             "max_participants": {
               "max": {
                 "field": "participants_count"
+              }
+            },
+            "distinct_participants":{
+              "cardinality": {
+                "field": "from_id"
               }
             },
             "sentiment_average":{
