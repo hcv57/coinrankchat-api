@@ -58,14 +58,11 @@ _setup_database()
 
 SEARCH_QUERY = {
   "query": {
-  "constant_score": {
-    "filter": {
-      "range": {
-        "created_at": {
-          "gte": "now-3d"
-        }
-      }
-    }
+  "bool": {
+    "filter": [
+      {"range": {"created_at": {"gte": "now-3d"}}},
+      {"exists": {"field": "from_id"}}
+    ]
   }
 },
   "size": 0,
