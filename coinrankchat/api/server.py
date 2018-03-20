@@ -24,7 +24,14 @@ class Group():
         resp.body = json.dumps(doc, ensure_ascii=False, indent=" ", default=self.datetime_handler)
 
 
+class ChannelStats():
+
+    def on_get(self, _req, resp, channel_id):
+        doc = db.load_message_count_histogram(channel_id)
+        resp.body = json.dumps(doc, ensure_ascii=False, indent=" ")
+
 
 api = app = falcon.API()
 api.add_route('/api/groups', Groups())
 app.add_route('/api/group/{_id}', Group())
+app.add_route('/api/channel/{channel_id}/stats', ChannelStats())

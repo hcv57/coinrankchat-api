@@ -1,5 +1,5 @@
 import time
-from functools import reduce
+import datetime
 from elasticsearch_dsl import connections, DocType, Text, Integer, Date, datetime, Keyword, Float
 
 from . import config
@@ -54,6 +54,21 @@ def load_all_channels():
 def load_channel(_id):
     return ChatUpdate.get(_id).to_dict()
 
+def load_message_count_histogram(channel_id):
+    response = ChatUpdate.search().from_dict(get_MESSAGE_COUNT_HISTOGRAM_QUERY(channel_id)).execute()
+    # return response.to_dict()
+    def get_participants(rec):
+        try:
+            return rec["latestDocs"]["hits"]["hits"][0]["_source"]["participants_count"]
+        except:
+            return None
+    return [dict(
+        date=datetime.utcfromtimestamp(x.key/1000).strftime('%b %d'),
+        count=x.doc_count,
+        participants=get_participants(x.to_dict())
+    ) for x in response.aggregations.messages_over_time.buckets]
+
+
 _setup_database()
 
 SEARCH_QUERY = {
@@ -67,7 +82,7 @@ SEARCH_QUERY = {
 },
   "size": 0,
   "aggs": {
-    "global_sentiment_average":{
+    "global_sentiment_average": {
       "avg": {
         "field": "sentimentPolarity"
       }
@@ -125,3 +140,33 @@ SEARCH_QUERY = {
     }
   }
 
+get_MESSAGE_COUNT_HISTOGRAM_QUERY = lambda channel_id: {
+  "query": {
+  "bool": {
+    "filter": [
+      {"range": {"created_at": {"gte": "now-30d"}}},
+      {"term":{"channel_id": channel_id}}
+    ]
+  }},
+    "size": 0,
+    "aggs" : {
+        "messages_over_time" : {
+            "date_histogram" : {
+                "field" : "created_at",
+                "interval" : "day",
+                "format" : "MMM d"
+            },
+            "aggs": {
+              "latestDocs": {
+                "top_hits": {
+                  "size": 1,
+                        "_source": {
+                            "includes": [ "participants_count", "price" ]
+                        },
+                  "sort": [{"created_at": {"order": "desc"}}]
+                }
+              }
+            }
+        }
+    }
+}
